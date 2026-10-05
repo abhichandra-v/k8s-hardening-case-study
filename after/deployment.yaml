@@ -1,0 +1,108 @@
+# ✅ THE "AFTER" — the same workload, hardened to pass CIS-style checks.
+#
+# Every change maps to a finding from the baseline scan:
+#   - non-root (UID/GID > 10000), no privilege escalation, no privileged mode
+#   - all Linux capabilities dropped, read-only root filesystem + writable emptyDir
+#     only where the app actually needs to write (/tmp)
+#   - seccomp RuntimeDefault
+#   - image pinned by digest (immutable — can't change under you, clean rollback)
+#   - CPU/memory + ephemeral-storage requests and limits
+#   - liveness + readiness probes
+#   - podAntiAffinity so replicas spread across nodes
+#   - secrets come from a Secret, not plaintext env
+#   - no hostPath / Docker socket mount
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-api
+  namespace: payments
+  labels:
+    app: payments-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payments-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: payments-api
+    spec:
+      # The app doesn't call the Kubernetes API, so don't mount its token.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: payments-api
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: payments-api
+          # Pinned by digest — immutable and traceable (replace with your own).
+          image: ghcr.io/abhichandra-v/payments-api@sha256:3f29c1e5b7d44e8a9c217d4e5f6a8b90c1d2e3f4a5b6c7d8e9f0112233445566
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payments-api-secrets
+                  key: db-password
+            - name: STRIPE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: payments-api-secrets
+                  key: stripe-key
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+              ephemeral-storage: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+              ephemeral-storage: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          # Read-only root FS means writable scratch has to be explicit.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

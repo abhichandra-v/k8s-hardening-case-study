@@ -1,0 +1,15 @@
+# ❌ "BEFORE" — exposes the API straight to the internet via LoadBalancer,
+# no network policy restricting who can reach the pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-api
+  labels:
+    app: payments-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: payments-api
+  ports:
+    - port: 80
+      targetPort: 8080

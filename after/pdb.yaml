@@ -1,0 +1,11 @@
+# ✅ "AFTER" — keeps at least one pod serving during node drains / maintenance.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payments-api
+  namespace: payments
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: payments-api

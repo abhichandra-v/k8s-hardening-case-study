@@ -1,0 +1,17 @@
+# ✅ "AFTER" — ClusterIP, not internet-facing. Ingress/LB terminates at the edge;
+# the pods are only reachable in-cluster, gated further by the NetworkPolicy.
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-api
+  namespace: payments
+  labels:
+    app: payments-api
+spec:
+  type: ClusterIP
+  selector:
+    app: payments-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

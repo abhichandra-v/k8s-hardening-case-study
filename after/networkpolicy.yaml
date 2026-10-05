@@ -1,0 +1,32 @@
+# ✅ "AFTER" — default-deny ingress for the pods, then allow only what's needed.
+# Without this, every pod in the cluster can talk to payments-api by default.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payments-api
+  namespace: payments
+spec:
+  podSelector:
+    matchLabels:
+      app: payments-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only pods explicitly labelled as allowed clients may reach the API.
+    - from:
+        - podSelector:
+            matchLabels:
+              role: payments-client
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow DNS so the app can resolve names.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

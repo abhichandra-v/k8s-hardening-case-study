@@ -1,0 +1,8 @@
+# ✅ "AFTER" — a dedicated namespace. Running in `default` is a common finding:
+# it mixes workloads and makes RBAC and NetworkPolicy scoping sloppy.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments
+  labels:
+    name: payments
